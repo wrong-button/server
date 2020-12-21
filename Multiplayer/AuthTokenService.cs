@@ -1,9 +1,9 @@
-﻿using ExitPath.Server.Models;
+﻿using ExitPath.Server.Config;
+using ExitPath.Server.Models;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
-using System.Text;
 
 namespace ExitPath.Server.Multiplayer
 {
@@ -11,25 +11,26 @@ namespace ExitPath.Server.Multiplayer
     {
         private readonly JwtSecurityTokenHandler tokenHandler = new();
         private readonly AuthConfig config;
-        private readonly SymmetricSecurityKey key;
+        private readonly SigningCredentials credentials;
 
         public AuthTokenService(IOptions<AuthConfig> config)
         {
             this.config = config.Value;
-            this.key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config.Value.TokenSecret));
+            this.credentials = config.Value.CreateCredentials();
         }
 
-        public string Sign(PlayerData data)
+        public string Sign(PlayerData data, string roomId)
         {
             var desc = new SecurityTokenDescriptor
             {
-                SigningCredentials = new SigningCredentials(this.key, SecurityAlgorithms.HmacSha256Signature),
+                SigningCredentials = this.credentials,
                 Issuer = this.config.Authority,
                 Audience = this.config.Authority,
                 Claims = new Dictionary<string, object>
                 {
                     { "sub", data.DisplayName },
                     { "player", data },
+                    { "roomId", roomId }
                 }
             };
             return tokenHandler.CreateEncodedJwt(desc);
