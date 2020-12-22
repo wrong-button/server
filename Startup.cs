@@ -32,6 +32,8 @@ namespace ExitPath.Server
                 .ValidateDataAnnotations();
 
             services.AddSingleton<AuthTokenService>();
+            services.AddSingleton<Realm>();
+            services.AddHostedService<RealmRunner>();
 
             services.AddCors();
             services.AddSingleton<IPostConfigureOptions<CorsOptions>, CORSPostConfigurer>();

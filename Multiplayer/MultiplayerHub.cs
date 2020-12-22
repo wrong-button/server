@@ -1,7 +1,10 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using ExitPath.Server.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Security.Claims;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace ExitPath.Server.Multiplayer
@@ -9,23 +12,46 @@ namespace ExitPath.Server.Multiplayer
     [Authorize(AuthenticationSchemes = "Multiplayer")]
     public class MultiplayerHub : Hub<IMultiplayerClient>
     {
-        private readonly ILogger<MultiplayerHub> logger;
+        private static readonly object PlayerKey = new();
 
-        public MultiplayerHub(ILogger<MultiplayerHub> logger)
+        private readonly ILogger<MultiplayerHub> logger;
+        private readonly Realm realm;
+
+        public MultiplayerHub(ILogger<MultiplayerHub> logger, Realm realm)
         {
             this.logger = logger;
+            this.realm = realm;
         }
 
-        public override Task OnConnectedAsync()
+        public override async Task OnConnectedAsync()
         {
+            await base.OnConnectedAsync();
+
+            var playerDataJSON = Context.User.FindFirstValue("player") ?? "";
+            var roomId = Context.User.FindFirstValue("roomId") ?? "lobby";
+            var playerData = JsonSerializer.Deserialize<PlayerData>(playerDataJSON);
+            if (playerData == null)
+            {
+                throw new Exception("Player data is null");
+            }
+
+            var player = new Player(Context.ConnectionId, playerData);
+            await this.realm.AddPlayer(player, roomId);
+            this.Context.Items[PlayerKey] = player;
+
             logger.LogInformation("Player {Name} ({ID}) connected", Context.UserIdentifier, Context.ConnectionId);
-            return base.OnConnectedAsync();
         }
 
-        public override Task OnDisconnectedAsync(Exception? exception)
+        public override async Task OnDisconnectedAsync(Exception? exception)
         {
+            if (this.Context.Items[PlayerKey] is Player player)
+            {
+                await this.realm.RemovePlayer(player);
+            }
+
             logger.LogInformation("Player {Name} ({ID}) disconnected", Context.UserIdentifier, Context.ConnectionId);
-            return base.OnDisconnectedAsync(exception);
+
+            await base.OnDisconnectedAsync(exception);
         }
     }
 }
