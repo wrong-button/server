@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 namespace ExitPath.Server.Multiplayer
 {
     [Authorize(AuthenticationSchemes = "Multiplayer")]
-    public class MultiplayerHub : Hub<IMultiplayerClient>
+    public class MultiplayerHub : Hub
     {
         private static readonly object PlayerKey = new();
 
@@ -39,7 +39,7 @@ namespace ExitPath.Server.Multiplayer
             await this.realm.AddPlayer(player, roomId);
             this.Context.Items[PlayerKey] = player;
 
-            logger.LogInformation("Player {Name} ({ID}) connected", Context.UserIdentifier, Context.ConnectionId);
+            logger.LogInformation("Player {Name} ({ID}) connected to {Room}", Context.UserIdentifier, Context.ConnectionId, roomId);
         }
 
         public override async Task OnDisconnectedAsync(Exception? exception)
