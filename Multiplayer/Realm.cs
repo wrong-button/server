@@ -37,10 +37,10 @@ namespace ExitPath.Server.Multiplayer
             this.AddRoom(new RoomLobby(this));
         }
 
-        private void AddRoom(IRoom room)
+        public void AddRoom(IRoom room)
         {
             rooms[room.Id] = room;
-            logger.LogInformation("Room {Id}({Name}) created", room.Id, room.Name);
+            logger.LogInformation("Room {Name}({Id}) created", room.Name, room.Id);
         }
 
         public async Task AddPlayer(Player player, string roomId)
@@ -52,6 +52,11 @@ namespace ExitPath.Server.Multiplayer
                 throw new Exception("Room not found");
             }
             room.AddPlayer(player);
+
+            if (this.players.TryRemove(player, out var oldRoom))
+            {
+                oldRoom.RemovePlayer(player);
+            }
             this.players[player] = room;
         }
 

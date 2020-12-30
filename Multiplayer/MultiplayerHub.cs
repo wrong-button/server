@@ -17,6 +17,12 @@ namespace ExitPath.Server.Multiplayer
         private readonly ILogger<MultiplayerHub> logger;
         private readonly Realm realm;
 
+        private Player Player
+        {
+            get => (Player)this.Context.Items[PlayerKey]!;
+            set => this.Context.Items[PlayerKey] = value;
+        }
+
         public MultiplayerHub(ILogger<MultiplayerHub> logger, Realm realm)
         {
             this.logger = logger;
@@ -37,21 +43,36 @@ namespace ExitPath.Server.Multiplayer
 
             var player = new Player(Context.ConnectionId, playerData);
             await this.realm.AddPlayer(player, roomId);
-            this.Context.Items[PlayerKey] = player;
+            this.Player = player;
 
             logger.LogInformation("Player {Name} ({ID}) connected to {Room}", Context.UserIdentifier, Context.ConnectionId, roomId);
         }
 
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            if (this.Context.Items[PlayerKey] is Player player)
-            {
-                await this.realm.RemovePlayer(player);
-            }
+            await this.realm.RemovePlayer(this.Player);
 
             logger.LogInformation("Player {Name} ({ID}) disconnected", Context.UserIdentifier, Context.ConnectionId);
 
             await base.OnDisconnectedAsync(exception);
+        }
+
+        public async Task<object> CreateGameRoom(string? roomName)
+        {
+            roomName ??= "";
+            if (roomName.Length == 0)
+            {
+                roomName = NameUtils.GenerateRoomName();
+            }
+            else if (roomName.Length > 50)
+            {
+                return new { Error = "Room name is too long" };
+            }
+
+            var room = new RoomGame(this.realm, roomName);
+            this.realm.AddRoom(room);
+            await this.realm.AddPlayer(this.Player, room.Id);
+            return new();
         }
     }
 }
