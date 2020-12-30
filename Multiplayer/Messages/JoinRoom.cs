@@ -9,5 +9,6 @@ namespace ExitPath.Server.Multiplayer.Messages
         public string Id { get; init; } = "";
         public string Name { get; init; } = "";
         public IReadOnlyList<RemotePlayer> Players { get; init; } = Array.Empty<RemotePlayer>();
+        public object State { get; init; } = new();
     }
 }

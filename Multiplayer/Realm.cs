@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -24,7 +25,8 @@ namespace ExitPath.Server.Multiplayer
 
         private readonly ConcurrentDictionary<string, IRoom> rooms = new();
         private readonly ConcurrentDictionary<Player, IRoom> players = new();
-        public int RoomListVersion { get; set; }
+
+        public IEnumerable<IRoom> Rooms => this.rooms.Values;
 
         private readonly Channel<MessageSend> msgChannel = Channel.CreateUnbounded<MessageSend>();
 
@@ -37,7 +39,6 @@ namespace ExitPath.Server.Multiplayer
 
         private void AddRoom(IRoom room)
         {
-            this.RoomListVersion++;
             rooms[room.Id] = room;
             logger.LogInformation("Room {Id}({Name}) created", room.Id, room.Name);
         }
