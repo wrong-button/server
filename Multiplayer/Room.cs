@@ -39,6 +39,7 @@ namespace ExitPath.Server.Multiplayer
         public virtual void AddPlayer(Player player)
         {
             this.Players = this.Players.Add(player.ConnectionId, player);
+            // TODO: send JoinRoom message
         }
 
         public virtual void RemovePlayer(Player player)
