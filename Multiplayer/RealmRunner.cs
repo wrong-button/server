@@ -18,9 +18,14 @@ namespace ExitPath.Server.Multiplayer
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            await Task.WhenAll(this.TickRealm(stoppingToken), this.realm.PumpMessages(stoppingToken));
+        }
+
+        private async Task TickRealm(CancellationToken token)
+        {
             while (true)
             {
-                await Task.Delay(TickMS, stoppingToken);
+                await Task.Delay(TickMS, token);
                 await this.realm.Tick();
             }
         }

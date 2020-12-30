@@ -3,12 +3,21 @@ using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Concurrent;
+using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 
 namespace ExitPath.Server.Multiplayer
 {
     public class Realm
     {
+        private readonly struct MessageSend
+        {
+            public string Target { get; init; }
+            public string MessageName { get; init; }
+            public object Message { get; init; }
+        }
+
         private readonly ILogger<Realm> logger;
         private readonly IHubContext<MultiplayerHub> hub;
         private readonly AsyncLock realmLock = new();
@@ -16,6 +25,8 @@ namespace ExitPath.Server.Multiplayer
         private readonly ConcurrentDictionary<string, IRoom> rooms = new();
         private readonly ConcurrentDictionary<Player, IRoom> players = new();
         public int RoomListVersion { get; set; }
+
+        private readonly Channel<MessageSend> msgChannel = Channel.CreateUnbounded<MessageSend>();
 
         public Realm(ILogger<Realm> logger, IHubContext<MultiplayerHub> hub)
         {
@@ -54,9 +65,14 @@ namespace ExitPath.Server.Multiplayer
             room.RemovePlayer(player);
         }
 
-        public async Task SendMessage(Player target, object msg)
+        public void SendMessage(Player target, object msg)
         {
-            await this.hub.Clients.Client(target.ConnectionId).SendAsync(msg.GetType().Name, msg);
+            this.msgChannel.Writer.TryWrite(new MessageSend
+            {
+                Target = target.ConnectionId,
+                MessageName = msg.GetType().Name,
+                Message = msg
+            });
         }
 
         public async Task Tick()
@@ -65,7 +81,15 @@ namespace ExitPath.Server.Multiplayer
 
             foreach (var room in this.rooms.Values)
             {
-                await room.Tick();
+                room.Tick();
+            }
+        }
+
+        public async Task PumpMessages(CancellationToken token)
+        {
+            await foreach (var msg in this.msgChannel.Reader.ReadAllAsync(token))
+            {
+                await this.hub.Clients.Client(msg.Target).SendAsync(msg.MessageName, msg.Message, token);
             }
         }
     }

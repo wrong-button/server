@@ -3,7 +3,7 @@ using ExitPath.Server.Multiplayer.Messages;
 using ExitPath.Server.Multiplayer.Models;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Threading.Tasks;
+using System.Linq;
 
 namespace ExitPath.Server.Multiplayer
 {
@@ -20,7 +20,18 @@ namespace ExitPath.Server.Multiplayer
             this.Data = data;
         }
 
-        public async Task Tick(IRoom room)
+        public void OnJoinRoom(IRoom room)
+        {
+            this.players = room.Players;
+            room.Realm.SendMessage(this, new JoinRoom
+            {
+                Id = room.Id,
+                Name = room.Name,
+                Players = room.Players.Values.Select(p => new RemotePlayer(p)).ToList(),
+            });
+        }
+
+        public void Tick(IRoom room)
         {
             if (this.players != room.Players)
             {
@@ -42,7 +53,7 @@ namespace ExitPath.Server.Multiplayer
                 }
 
                 this.players = room.Players;
-                await room.Realm.SendMessage(this, new UpdatePlayers
+                room.Realm.SendMessage(this, new UpdatePlayers
                 {
                     Joined = newPlayers,
                     Exited = removedPlayers,

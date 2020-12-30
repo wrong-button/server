@@ -1,5 +1,4 @@
 ﻿using System.Collections.Immutable;
-using System.Threading.Tasks;
 
 namespace ExitPath.Server.Multiplayer
 {
@@ -15,7 +14,7 @@ namespace ExitPath.Server.Multiplayer
         void AddPlayer(Player player);
         void RemovePlayer(Player player);
 
-        Task Tick();
+        void Tick();
     }
 
     public abstract class Room<T> : IRoom where T : notnull
@@ -39,7 +38,7 @@ namespace ExitPath.Server.Multiplayer
         public virtual void AddPlayer(Player player)
         {
             this.Players = this.Players.Add(player.ConnectionId, player);
-            // TODO: send JoinRoom message
+            player.OnJoinRoom(this);
         }
 
         public virtual void RemovePlayer(Player player)
@@ -47,11 +46,11 @@ namespace ExitPath.Server.Multiplayer
             this.Players = this.Players.Remove(player.ConnectionId);
         }
 
-        public virtual async Task Tick()
+        public virtual void Tick()
         {
             foreach (var player in this.Players.Values)
             {
-                await player.Tick(this);
+                player.Tick(this);
             }
         }
     }
