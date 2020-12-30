@@ -74,5 +74,19 @@ namespace ExitPath.Server.Multiplayer
             await this.realm.AddPlayer(this.Player, room.Id);
             return new();
         }
+
+        public async Task<object> JoinRoom(string? roomId)
+        {
+            roomId ??= "";
+            try
+            {
+                await this.realm.AddPlayer(this.Player, roomId);
+            }
+            catch (Exception e)
+            {
+                return new { Error = e.Message };
+            }
+            return new();
+        }
     }
 }
