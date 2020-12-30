@@ -18,7 +18,7 @@ namespace ExitPath.Server.Controllers.Multiplayer
 
         public IActionResult Handle([FromBody] AuthRequest request)
         {
-            var token = this.authToken.Sign(request.Player, request.RoomId);
+            var token = this.authToken.Sign(request.Player);
             return Ok(new AuthResponse { Token = token });
         }
     }
@@ -27,9 +27,6 @@ namespace ExitPath.Server.Controllers.Multiplayer
     {
         [Required]
         public PlayerData Player { get; init; } = new();
-
-        [Required]
-        public string RoomId { get; init; } = "";
     }
 
     public record AuthResponse

@@ -19,7 +19,7 @@ namespace ExitPath.Server.Multiplayer
             this.credentials = config.Value.CreateCredentials();
         }
 
-        public string Sign(PlayerData data, string roomId)
+        public string Sign(PlayerData data)
         {
             var desc = new SecurityTokenDescriptor
             {
@@ -29,8 +29,7 @@ namespace ExitPath.Server.Multiplayer
                 Claims = new Dictionary<string, object>
                 {
                     { "sub", data.DisplayName },
-                    { "player", data },
-                    { "roomId", roomId }
+                    { "player", data }
                 }
             };
             return tokenHandler.CreateEncodedJwt(desc);

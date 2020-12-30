@@ -34,7 +34,6 @@ namespace ExitPath.Server.Multiplayer
             await base.OnConnectedAsync();
 
             var playerDataJSON = Context.User.FindFirstValue("player") ?? "";
-            var roomId = Context.User.FindFirstValue("roomId") ?? "lobby";
             var playerData = JsonSerializer.Deserialize<PlayerData>(playerDataJSON);
             if (playerData == null)
             {
@@ -42,17 +41,17 @@ namespace ExitPath.Server.Multiplayer
             }
 
             var player = new Player(Context.ConnectionId, playerData);
-            await this.realm.AddPlayer(player, roomId);
+            await this.realm.AddPlayer(player, "lobby");
             this.Player = player;
 
-            logger.LogInformation("Player {Name} ({ID}) connected to {Room}", Context.UserIdentifier, Context.ConnectionId, roomId);
+            logger.LogInformation("Player '{Name}' ({ID}) connected", Context.UserIdentifier, Context.ConnectionId);
         }
 
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
             await this.realm.RemovePlayer(this.Player);
 
-            logger.LogInformation("Player {Name} ({ID}) disconnected", Context.UserIdentifier, Context.ConnectionId);
+            logger.LogInformation("Player '{Name}' ({ID}) disconnected", Context.UserIdentifier, Context.ConnectionId);
 
             await base.OnDisconnectedAsync(exception);
         }

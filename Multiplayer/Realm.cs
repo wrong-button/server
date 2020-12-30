@@ -40,7 +40,7 @@ namespace ExitPath.Server.Multiplayer
         public void AddRoom(IRoom room)
         {
             rooms[room.Id] = room;
-            logger.LogInformation("Room {Name}({Id}) created", room.Name, room.Id);
+            logger.LogInformation("Room '{Name}' ({Id}) created", room.Name, room.Id);
         }
 
         public async Task AddPlayer(Player player, string roomId)
@@ -58,6 +58,8 @@ namespace ExitPath.Server.Multiplayer
                 oldRoom.RemovePlayer(player);
             }
             this.players[player] = room;
+
+            logger.LogInformation("Player '{Name}' joined room '{Room}'", player.Data.DisplayName, room.Name);
         }
 
         public async Task RemovePlayer(Player player)
@@ -69,6 +71,8 @@ namespace ExitPath.Server.Multiplayer
                 return;
             }
             room.RemovePlayer(player);
+
+            logger.LogInformation("Player '{Name}' left", player.Data.DisplayName);
         }
 
         public void SendMessage(Player target, object msg)
