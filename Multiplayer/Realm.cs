@@ -2,8 +2,8 @@
 using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
@@ -41,6 +41,14 @@ namespace ExitPath.Server.Multiplayer
         {
             rooms[room.Id] = room;
             logger.LogInformation("Room '{Name}' ({Id}) created", room.Name, room.Id);
+        }
+
+        private void DeleteRoom(IRoom room)
+        {
+            if (rooms.Remove(room.Id))
+            {
+                logger.LogInformation("Room '{Name}' ({Id}) deleted", room.Name, room.Id);
+            }
         }
 
         private void AddPlayer(Player player, IRoom room)
@@ -102,6 +110,13 @@ namespace ExitPath.Server.Multiplayer
         {
             using var _lock = await this.realmLock.LockAsync();
 
+            foreach (var room in this.rooms.Values.ToList())
+            {
+                if (room is RoomGame && room.Players.Count == 0)
+                {
+                    this.DeleteRoom(room);
+                }
+            }
             foreach (var room in this.rooms.Values)
             {
                 room.Tick();
