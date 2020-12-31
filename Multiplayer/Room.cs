@@ -8,7 +8,7 @@ namespace ExitPath.Server.Multiplayer
         string Name { get; }
         Realm Realm { get; }
 
-        object State { get; }
+        IRoomState State { get; }
         ImmutableDictionary<string, Player> Players { get; }
 
         void AddPlayer(Player player);
@@ -17,14 +17,14 @@ namespace ExitPath.Server.Multiplayer
         void Tick();
     }
 
-    public abstract class Room<T> : IRoom where T : notnull
+    public abstract class Room<T> : IRoom where T : IRoomState<T>
     {
         public Realm Realm { get; }
         public string Id { get; }
         public string Name { get; }
 
         public T State { get; set; }
-        object IRoom.State => this.State;
+        IRoomState IRoom.State => this.State;
         public ImmutableDictionary<string, Player> Players { get; private set; } = ImmutableDictionary.Create<string, Player>();
 
         public Room(Realm realm, string id, string name, T state)

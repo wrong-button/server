@@ -13,7 +13,7 @@ namespace ExitPath.Server.Multiplayer
         public PlayerData Data { get; }
 
         private ImmutableDictionary<string, Player> players = ImmutableDictionary.Create<string, Player>();
-        private object? state = null;
+        private IRoomState? state = null;
 
         public Player(string connId, PlayerData data)
         {
@@ -30,7 +30,7 @@ namespace ExitPath.Server.Multiplayer
                 Id = room.Id,
                 Name = room.Name,
                 Players = room.Players.Values.Select(p => new RemotePlayer(p)).ToList(),
-                State = room.State,
+                State = room.State.ToJSON(),
             });
         }
 
@@ -62,12 +62,13 @@ namespace ExitPath.Server.Multiplayer
                     Exited = removedPlayers,
                 });
             }
-            if (this.state != room.State)
+
+            if (this.state != null && room.State.Diff(this.state) is object diff)
             {
                 this.state = room.State;
                 room.Realm.SendMessage(this, new UpdateState
                 {
-                    NewState = room.State,
+                    Diff = diff,
                 });
             }
         }

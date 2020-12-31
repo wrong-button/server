@@ -1,13 +1,52 @@
 ﻿using ExitPath.Server.Multiplayer.Models;
-using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 
 namespace ExitPath.Server.Multiplayer
 {
-    public record RoomLobbyState
+    public record RoomLobbyState : RoomState<RoomLobbyState>
     {
-        public IReadOnlyList<RemoteRoom> Rooms { get; init; } = Array.Empty<RemoteRoom>();
+        public ImmutableDictionary<string, RemoteRoom> Rooms { get; init; } = ImmutableDictionary.Create<string, RemoteRoom>();
+
+        public override object ToJSON()
+        {
+            return new
+            {
+                Rooms = this.Rooms.Values.OrderBy(r => r.Name).ToList()
+            };
+        }
+
+        public override object? Diff(RoomLobbyState oldState)
+        {
+            var diff = new
+            {
+                Removed = new List<string>(),
+                Updated = new List<RemoteRoom>(),
+            };
+
+            foreach (var (id, room) in this.Rooms)
+            {
+                if (!oldState.Rooms.TryGetValue(id, out var oldRoom) || !oldRoom.Equals(room))
+                {
+                    diff.Updated.Add(room);
+                }
+            }
+            foreach (var id in oldState.Rooms.Keys)
+            {
+                if (!this.Rooms.ContainsKey(id))
+                {
+                    diff.Removed.Add(id);
+                }
+            }
+
+            if (diff.Removed.Count == 0 && diff.Updated.Count == 0)
+            {
+                return null;
+            }
+
+            return diff;
+        }
     }
 
     public class RoomLobby : Room<RoomLobbyState>
@@ -18,16 +57,12 @@ namespace ExitPath.Server.Multiplayer
 
         public override void Tick()
         {
-            var rooms = new List<RemoteRoom>();
+            var rooms = ImmutableDictionary.CreateBuilder<string, RemoteRoom>();
             foreach (var room in this.Realm.Rooms.OfType<RoomGame>())
             {
-                rooms.Add(new RemoteRoom(room));
+                rooms[room.Id] = new RemoteRoom(room);
             }
-            rooms.Sort((a, b) => a.Name.CompareTo(b.Name));
-            if (!rooms.SequenceEqual(this.State.Rooms))
-            {
-                this.State = this.State with { Rooms = rooms };
-            }
+            this.State = this.State with { Rooms = rooms.ToImmutable() };
 
             base.Tick();
         }

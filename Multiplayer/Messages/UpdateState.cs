@@ -2,6 +2,6 @@
 {
     public record UpdateState
     {
-        public object NewState { get; init; } = new();
+        public object Diff { get; init; } = new();
     }
 }
