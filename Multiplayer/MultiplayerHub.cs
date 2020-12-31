@@ -69,8 +69,7 @@ namespace ExitPath.Server.Multiplayer
             }
 
             var room = new RoomGame(this.realm, roomName);
-            this.realm.AddRoom(room);
-            await this.realm.AddPlayer(this.Player, room.Id);
+            await this.realm.CreateRoom(this.Player, room);
             return new();
         }
 

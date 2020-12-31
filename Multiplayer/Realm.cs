@@ -23,8 +23,8 @@ namespace ExitPath.Server.Multiplayer
         private readonly IHubContext<MultiplayerHub> hub;
         private readonly AsyncLock realmLock = new();
 
-        private readonly ConcurrentDictionary<string, IRoom> rooms = new();
-        private readonly ConcurrentDictionary<Player, IRoom> players = new();
+        private readonly Dictionary<string, IRoom> rooms = new();
+        private readonly Dictionary<Player, IRoom> players = new();
 
         public IEnumerable<IRoom> Rooms => this.rooms.Values;
 
@@ -37,10 +37,23 @@ namespace ExitPath.Server.Multiplayer
             this.AddRoom(new RoomLobby(this));
         }
 
-        public void AddRoom(IRoom room)
+        private void AddRoom(IRoom room)
         {
             rooms[room.Id] = room;
             logger.LogInformation("Room '{Name}' ({Id}) created", room.Name, room.Id);
+        }
+
+        private void AddPlayer(Player player, IRoom room)
+        {
+            room.AddPlayer(player);
+
+            if (this.players.Remove(player, out var oldRoom))
+            {
+                oldRoom.RemovePlayer(player);
+            }
+            this.players[player] = room;
+
+            logger.LogInformation("Player '{Name}' joined room '{Room}'", player.Data.DisplayName, room.Name);
         }
 
         public async Task AddPlayer(Player player, string roomId)
@@ -51,28 +64,28 @@ namespace ExitPath.Server.Multiplayer
             {
                 throw new Exception("Room not found");
             }
-            room.AddPlayer(player);
-
-            if (this.players.TryRemove(player, out var oldRoom))
-            {
-                oldRoom.RemovePlayer(player);
-            }
-            this.players[player] = room;
-
-            logger.LogInformation("Player '{Name}' joined room '{Room}'", player.Data.DisplayName, room.Name);
+            this.AddPlayer(player, room);
         }
 
         public async Task RemovePlayer(Player player)
         {
             using var _lock = await this.realmLock.LockAsync();
 
-            if (!this.players.TryRemove(player, out var room))
+            if (!this.players.Remove(player, out var room))
             {
                 return;
             }
             room.RemovePlayer(player);
 
             logger.LogInformation("Player '{Name}' left", player.Data.DisplayName);
+        }
+
+        public async Task CreateRoom(Player player, IRoom room)
+        {
+            using var _lock = await this.realmLock.LockAsync();
+
+            this.AddRoom(room);
+            this.AddPlayer(player, room);
         }
 
         public void SendMessage(Player target, object msg)
