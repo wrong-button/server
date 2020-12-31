@@ -9,6 +9,28 @@ namespace ExitPath.Server.Multiplayer
 {
     public record GamePlayer(int LocalId, Player Player);
 
+    public record GamePlayerPosition(
+        int Version,
+        float X,
+        float Y,
+        int Frame,
+        int ScaleX,
+        int CompletionTime)
+    {
+        public object[] ToJSON(int id)
+        {
+            return new object[] { id, this.Version, this.X, this.Y, this.Frame, this.ScaleX, this.CompletionTime };
+        }
+    }
+
+    public record GamePlayerCheckpoints(ImmutableHashSet<int> Ids)
+    {
+        public object[] ToJSON(int id)
+        {
+            return new int[] { id }.Concat(Ids).Cast<object>().ToArray();
+        }
+    }
+
     public record GamePlayerData
     {
         public string Id { get; init; }
@@ -45,6 +67,12 @@ namespace ExitPath.Server.Multiplayer
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? NextLevel { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<object[]>? Positions { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<object[]>? Checkpoints { get; set; }
     }
 
     public record RoomGameState : RoomState<RoomGameState>
@@ -56,6 +84,9 @@ namespace ExitPath.Server.Multiplayer
         public int Timer { get; init; } = 0;
         public int NextLevel { get; init; } = 0;
 
+        public ImmutableDictionary<int, GamePlayerPosition> Positions = ImmutableDictionary.Create<int, GamePlayerPosition>();
+        public ImmutableDictionary<int, GamePlayerCheckpoints> Checkpoints = ImmutableDictionary.Create<int, GamePlayerCheckpoints>();
+
         public override object ToJSON()
         {
             return new
@@ -64,6 +95,8 @@ namespace ExitPath.Server.Multiplayer
                 Phase = this.Phase.ToString(),
                 Timer = (int)Math.Ceiling((double)this.Timer / Realm.TPS),
                 NextLevel = this.NextLevel,
+                Positions = Positions.Select((p) => p.Value.ToJSON(p.Key)).ToList(),
+                Checkpoints = Checkpoints.Select((p) => p.Value.ToJSON(p.Key)).ToList()
             };
         }
 
@@ -110,6 +143,48 @@ namespace ExitPath.Server.Multiplayer
                 needDiff = true;
             }
 
+            if (this.Positions.Count == 0 && oldState.Positions.Count != 0)
+            {
+                diff.Positions = new();
+                needDiff = true;
+            }
+            else if (this.Positions.Count != 0)
+            {
+                foreach (var (id, pos) in this.Positions)
+                {
+                    if (!oldState.Positions.TryGetValue(id, out var oldPos) || !oldPos.Equals(pos))
+                    {
+                        if (diff.Positions == null)
+                        {
+                            diff.Positions = new();
+                        }
+                        diff.Positions.Add(pos.ToJSON(id));
+                        needDiff = true;
+                    }
+                }
+            }
+
+            if (this.Checkpoints.Count == 0 && oldState.Checkpoints.Count != 0)
+            {
+                diff.Checkpoints = new();
+                needDiff = true;
+            }
+            else if (this.Checkpoints.Count != 0)
+            {
+                foreach (var (id, cp) in this.Checkpoints)
+                {
+                    if (!oldState.Checkpoints.TryGetValue(id, out var oldCP) || !oldCP.Ids.SequenceEqual(cp.Ids))
+                    {
+                        if (diff.Checkpoints == null)
+                        {
+                            diff.Checkpoints = new();
+                        }
+                        diff.Checkpoints.Add(cp.ToJSON(id));
+                        needDiff = true;
+                    }
+                }
+            }
+
             if (diff.Removed.Count == 0)
             {
                 diff.Removed = null;
@@ -146,6 +221,7 @@ namespace ExitPath.Server.Multiplayer
                         Phase = GamePhase.Lobby,
                         Timer = this.Realm.Config.GameCountdown * Realm.TPS,
                         NextLevel = 100 + rand.Next(20),
+                        Checkpoints = ImmutableDictionary<int, GamePlayerCheckpoints>.Empty,
                     };
                     break;
 
@@ -153,7 +229,9 @@ namespace ExitPath.Server.Multiplayer
                     this.State = this.State with
                     {
                         Phase = GamePhase.InGame,
-                        Timer = 0,
+                        Timer = this.Realm.Config.FinishCountdown * Realm.TPS,
+                        Positions = ImmutableDictionary<int, GamePlayerPosition>.Empty,
+                        Checkpoints = ImmutableDictionary<int, GamePlayerCheckpoints>.Empty,
                     };
                     break;
             }
@@ -166,23 +244,23 @@ namespace ExitPath.Server.Multiplayer
                 throw new Exception("Game is in progress");
             }
 
-            base.AddPlayer(player);
-
             this.State = this.State with
             {
                 NextId = this.State.NextId + 1,
                 Players = this.State.Players.Add(player.ConnectionId, new(this.State.NextId, player)),
             };
+
+            base.AddPlayer(player);
         }
 
         public override void RemovePlayer(Player player)
         {
-            base.RemovePlayer(player);
-
             this.State = this.State with
             {
                 Players = this.State.Players.Remove(player.ConnectionId)
             };
+
+            base.RemovePlayer(player);
         }
 
         public override void Tick()
@@ -208,6 +286,34 @@ namespace ExitPath.Server.Multiplayer
             }
 
             base.Tick();
+        }
+
+        public void ReportPosition(Player player, GamePlayerPosition pos)
+        {
+            if (!this.State.Players.TryGetValue(player.ConnectionId, out var p))
+            {
+                return;
+            }
+
+            this.State = this.State with
+            {
+                Positions = this.State.Positions.SetItem(p.LocalId, pos)
+            };
+        }
+
+        public void ReportCheckpoint(Player player, int id)
+        {
+            if (!this.State.Players.TryGetValue(player.ConnectionId, out var p))
+            {
+                return;
+            }
+
+            var cp = this.State.Checkpoints.GetValueOrDefault(p.LocalId) ?? new(ImmutableHashSet.Create<int>());
+            cp = cp with { Ids = cp.Ids.Add(id) };
+            this.State = this.State with
+            {
+                Checkpoints = this.State.Checkpoints.SetItem(p.LocalId, cp)
+            };
         }
     }
 }

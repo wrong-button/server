@@ -13,6 +13,7 @@ namespace ExitPath.Server.Multiplayer
     public class MultiplayerHub : Hub
     {
         private static readonly object PlayerKey = new();
+        private static readonly object RoomKey = new();
 
         private readonly ILogger<MultiplayerHub> logger;
         private readonly Realm realm;
@@ -21,6 +22,12 @@ namespace ExitPath.Server.Multiplayer
         {
             get => (Player)this.Context.Items[PlayerKey]!;
             set => this.Context.Items[PlayerKey] = value;
+        }
+
+        private IRoom Room
+        {
+            get => (IRoom)this.Context.Items[RoomKey]!;
+            set => this.Context.Items[RoomKey] = value;
         }
 
         public MultiplayerHub(ILogger<MultiplayerHub> logger, Realm realm)
@@ -41,8 +48,9 @@ namespace ExitPath.Server.Multiplayer
             }
 
             var player = new Player(Context.ConnectionId, playerData);
-            await this.realm.AddPlayer(player, "lobby");
+            var room = await this.realm.AddPlayer(player, "lobby");
             this.Player = player;
+            this.Room = room;
 
             logger.LogInformation("Player '{Name}' ({ID}) connected", Context.UserIdentifier, Context.ConnectionId);
         }
@@ -70,6 +78,7 @@ namespace ExitPath.Server.Multiplayer
 
             var room = new RoomGame(this.realm, roomName);
             await this.realm.CreateRoom(this.Player, room);
+            this.Room = room;
             return new();
         }
 
@@ -78,13 +87,32 @@ namespace ExitPath.Server.Multiplayer
             roomId ??= "";
             try
             {
-                await this.realm.AddPlayer(this.Player, roomId);
+                var room = await this.realm.AddPlayer(this.Player, roomId);
+                this.Room = room;
             }
             catch (Exception e)
             {
                 return new { Error = e.Message };
             }
             return new();
+        }
+
+        public void ReportPosition(int v, float x, float y, int fr, int sx, int t)
+        {
+            if (this.Room is RoomGame room)
+            {
+                var player = this.Player;
+                this.realm.EnqueueAction(() => room.ReportPosition(player, new GamePlayerPosition(v, x, y, fr, sx, t)));
+            }
+        }
+
+        public void ReportCheckpoint(int id)
+        {
+            if (this.Room is RoomGame room)
+            {
+                var player = this.Player;
+                this.realm.EnqueueAction(() => room.ReportCheckpoint(player, id));
+            }
         }
     }
 }

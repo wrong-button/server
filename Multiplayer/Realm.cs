@@ -35,6 +35,7 @@ namespace ExitPath.Server.Multiplayer
         public RealmConfig Config { get; }
 
         private readonly Channel<MessageSend> msgChannel = Channel.CreateUnbounded<MessageSend>();
+        private readonly Channel<Action> actionChannel = Channel.CreateUnbounded<Action>();
 
         public Realm(ILogger<Realm> logger, IHubContext<MultiplayerHub> hub, IOptions<RealmConfig> config)
         {
@@ -71,7 +72,7 @@ namespace ExitPath.Server.Multiplayer
             logger.LogInformation("Player '{Name}' joined room '{Room}'", player.Data.DisplayName, room.Name);
         }
 
-        public async Task AddPlayer(Player player, string roomId)
+        public async Task<IRoom> AddPlayer(Player player, string roomId)
         {
             using var _lock = await this.realmLock.LockAsync();
 
@@ -80,6 +81,7 @@ namespace ExitPath.Server.Multiplayer
                 throw new Exception("Room not found");
             }
             this.AddPlayer(player, room);
+            return room;
         }
 
         public async Task RemovePlayer(Player player)
@@ -113,9 +115,19 @@ namespace ExitPath.Server.Multiplayer
             });
         }
 
+        public void EnqueueAction(Action action)
+        {
+            this.actionChannel.Writer.TryWrite(action);
+        }
+
         public async Task Tick()
         {
             using var _lock = await this.realmLock.LockAsync();
+
+            while (this.actionChannel.Reader.TryRead(out var action))
+            {
+                action();
+            }
 
             foreach (var room in this.rooms.Values.ToList())
             {
