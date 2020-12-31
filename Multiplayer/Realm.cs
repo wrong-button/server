@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.SignalR;
+﻿using ExitPath.Server.Config;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Nito.AsyncEx;
 using System;
 using System.Collections.Generic;
@@ -12,6 +14,8 @@ namespace ExitPath.Server.Multiplayer
 {
     public class Realm
     {
+        public const int TPS = 20;
+
         private readonly struct MessageSend
         {
             public string Target { get; init; }
@@ -28,12 +32,15 @@ namespace ExitPath.Server.Multiplayer
 
         public IEnumerable<IRoom> Rooms => this.rooms.Values;
 
+        public RealmConfig Config { get; }
+
         private readonly Channel<MessageSend> msgChannel = Channel.CreateUnbounded<MessageSend>();
 
-        public Realm(ILogger<Realm> logger, IHubContext<MultiplayerHub> hub)
+        public Realm(ILogger<Realm> logger, IHubContext<MultiplayerHub> hub, IOptions<RealmConfig> config)
         {
             this.logger = logger;
             this.hub = hub;
+            this.Config = config.Value;
             this.AddRoom(new RoomLobby(this));
         }
 

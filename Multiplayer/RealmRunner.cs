@@ -6,8 +6,7 @@ namespace ExitPath.Server.Multiplayer
 {
     public class RealmRunner : BackgroundService
     {
-        private const int TPS = 20;
-        private const int TickMS = 1000 / TPS;
+        private const int TickMS = 1000 / Realm.TPS;
 
         private readonly Realm realm;
 

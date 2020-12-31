@@ -27,6 +27,9 @@ namespace ExitPath.Server
             services.AddOptions<AuthConfig>()
                 .Bind(Configuration.GetSection("Multiplayer:Auth"))
                 .ValidateDataAnnotations();
+            services.AddOptions<RealmConfig>()
+                .Bind(Configuration.GetSection("Multiplayer"))
+                .ValidateDataAnnotations();
             services.AddOptions<HTTPConfig>()
                 .Bind(Configuration)
                 .ValidateDataAnnotations();
