@@ -91,7 +91,7 @@ namespace ExitPath.Server.Multiplayer
         {
             return new
             {
-                Players = Players.Values.Select(p => new GamePlayerData(p)).OrderBy(p => p.Id).ToList(),
+                Players = Players.Values.Select(p => new GamePlayerData(p)).OrderBy(p => p.LocalId).ToList(),
                 Phase = this.Phase.ToString(),
                 Timer = (int)Math.Ceiling((double)this.Timer / Realm.TPS),
                 NextLevel = this.NextLevel,
@@ -268,21 +268,52 @@ namespace ExitPath.Server.Multiplayer
             switch (this.State.Phase)
             {
                 case GamePhase.Lobby:
-                    var timer = this.State.Timer - 1;
-                    if (this.Players.Count <= 1)
                     {
-                        timer = this.Realm.Config.GameCountdown * Realm.TPS;
+                        var timer = this.State.Timer - 1;
+                        if (this.Players.Count <= 1)
+                        {
+                            timer = this.Realm.Config.GameCountdown * Realm.TPS;
+                        }
+                        if (timer <= 0)
+                        {
+                            this.StartPhase(GamePhase.InGame);
+                            goto case GamePhase.InGame;
+                        }
+                        this.State = this.State with { Timer = timer };
+                        break;
                     }
-                    if (timer <= 0)
-                    {
-                        this.StartPhase(GamePhase.InGame);
-                        goto case GamePhase.InGame;
-                    }
-                    this.State = this.State with { Timer = timer };
-                    break;
-
                 case GamePhase.InGame:
-                    break;
+                    {
+                        var numFinished = 0;
+                        foreach (var p in this.State.Players.Values)
+                        {
+                            if (this.State.Positions.TryGetValue(p.LocalId, out var pos) && pos.CompletionTime > 0)
+                            {
+                                numFinished++;
+                            }
+                        }
+
+                        var timer = this.State.Timer;
+                        if (numFinished == this.State.Players.Count && timer > 3)
+                        {
+                            timer = 3;
+                        }
+                        if (numFinished > 0)
+                        {
+                            timer--;
+                        }
+
+                        if (timer <= 0)
+                        {
+                            this.StartPhase(GamePhase.Lobby);
+                            goto case GamePhase.Lobby;
+                        }
+                        else if (timer != this.State.Timer)
+                        {
+                            this.State = this.State with { Timer = timer };
+                        }
+                        break;
+                    }
             }
 
             base.Tick();
