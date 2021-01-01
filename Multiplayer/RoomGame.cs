@@ -81,6 +81,7 @@ namespace ExitPath.Server.Multiplayer
         public GamePhase Phase { get; init; } = GamePhase.Lobby;
         public int Timer { get; init; } = 0;
         public int NextLevel { get; init; } = 0;
+        public bool IsLevelFinished { get; init; } = false;
 
         public ImmutableDictionary<int, GamePlayerPosition> Positions = ImmutableDictionary.Create<int, GamePlayerPosition>();
         public ImmutableDictionary<int, GamePlayerCheckpoints> Checkpoints = ImmutableDictionary.Create<int, GamePlayerCheckpoints>();
@@ -251,6 +252,8 @@ namespace ExitPath.Server.Multiplayer
                         Timer = this.Realm.Config.FinishCountdown * Realm.TPS,
                         Positions = ImmutableDictionary<int, GamePlayerPosition>.Empty,
                         Checkpoints = ImmutableDictionary<int, GamePlayerCheckpoints>.Empty,
+                        Rewards = ImmutableDictionary<int, GamePlayerReward>.Empty,
+                        IsLevelFinished = false,
                     };
                     break;
             }
@@ -320,7 +323,7 @@ namespace ExitPath.Server.Multiplayer
                         {
                             timer = 3;
                         }
-                        if (numFinished > 0)
+                        if (this.State.IsLevelFinished)
                         {
                             timer--;
                         }
@@ -458,7 +461,8 @@ namespace ExitPath.Server.Multiplayer
             }
             this.State = this.State with
             {
-                Positions = this.State.Positions.SetItem(p.LocalId, pos)
+                Positions = this.State.Positions.SetItem(p.LocalId, pos),
+                IsLevelFinished = this.State.IsLevelFinished || pos.CompletionTime > 0
             };
         }
 
