@@ -1,4 +1,5 @@
 ﻿using ExitPath.Server.Models;
+using ExitPath.Server.Multiplayer.Messages;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,7 @@ namespace ExitPath.Server.Multiplayer
     {
         private static readonly object PlayerKey = new();
         private static readonly object RoomKey = new();
+        private static readonly object LastMessageKey = new();
 
         private readonly ILogger<MultiplayerHub> logger;
         private readonly Realm realm;
@@ -28,6 +30,12 @@ namespace ExitPath.Server.Multiplayer
         {
             get => (IRoom)this.Context.Items[RoomKey]!;
             set => this.Context.Items[RoomKey] = value;
+        }
+
+        private DateTime LastMessage
+        {
+            get => (DateTime)this.Context.Items[LastMessageKey]!;
+            set => this.Context.Items[LastMessageKey] = value;
         }
 
         public MultiplayerHub(ILogger<MultiplayerHub> logger, Realm realm)
@@ -51,6 +59,7 @@ namespace ExitPath.Server.Multiplayer
             var room = await this.realm.AddPlayer(player, "lobby");
             this.Player = player;
             this.Room = room;
+            this.LastMessage = DateTime.MinValue;
 
             logger.LogInformation("Player '{Name}' ({ID}) connected", Context.UserIdentifier, Context.ConnectionId);
         }
@@ -122,6 +131,23 @@ namespace ExitPath.Server.Multiplayer
                 var player = this.Player;
                 this.realm.EnqueueAction(() => room.GiveKudo(player, targetId));
             }
+        }
+
+        public void SendMessage(string text)
+        {
+            var now = DateTime.UtcNow;
+            if (now.Subtract(this.LastMessage).TotalSeconds < 0.3)
+            {
+                return;
+            }
+            this.LastMessage = now;
+
+            var player = this.Player;
+            var room = this.Room;
+            this.realm.EnqueueAction(() =>
+            {
+                room.BroadcastMessage(Message.Player(player, text));
+            });
         }
     }
 }

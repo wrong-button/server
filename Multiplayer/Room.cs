@@ -1,4 +1,5 @@
-﻿using System.Collections.Immutable;
+﻿using ExitPath.Server.Multiplayer.Messages;
+using System.Collections.Immutable;
 
 namespace ExitPath.Server.Multiplayer
 {
@@ -15,6 +16,9 @@ namespace ExitPath.Server.Multiplayer
         void RemovePlayer(Player player);
 
         void Tick();
+
+        void SendMessage(Player player, Message msg);
+        void BroadcastMessage(Message msg);
     }
 
     public abstract class Room<T> : IRoom where T : IRoomState<T>
@@ -51,6 +55,19 @@ namespace ExitPath.Server.Multiplayer
             foreach (var player in this.Players.Values)
             {
                 player.Tick(this);
+            }
+        }
+
+        public void SendMessage(Player player, Message msg)
+        {
+            this.Realm.SendMessage(player, msg);
+        }
+
+        public void BroadcastMessage(Message msg)
+        {
+            foreach (var player in this.Players.Values)
+            {
+                this.Realm.SendMessage(player, msg);
             }
         }
     }

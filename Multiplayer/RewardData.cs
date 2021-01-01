@@ -77,5 +77,50 @@
             }
             return level - 1;
         }
+
+        public static string LevelName(int level) => level switch
+        {
+            0 => "Novice",
+            1 => "Walker",
+            2 => "Jogger",
+            3 => "Runner",
+            4 => "Sprinter",
+            5 => "Windwalker",
+            6 => "Speedrunner",
+            7 => "Marathoner",
+            8 => "Earthrunner",
+            9 => "Pacer",
+            10 => "Drifter",
+            11 => "Voyager",
+            12 => "Nimble",
+            13 => "Expeditive",
+            14 => "Quick",
+            15 => "Outlast",
+            16 => "Spring",
+            17 => "Survivor",
+            18 => "Swift",
+            19 => "Trekker",
+            20 => "Tour",
+            21 => "Grace",
+            22 => "Agility",
+            23 => "Fast",
+            24 => "Zoom",
+            25 => "Fervor",
+            26 => "Rush",
+            27 => "Fly",
+            28 => "Momentum",
+            29 => "Haste",
+            30 => "Fleetness",
+            31 => "Forge",
+            32 => "Drive",
+            33 => "Boost",
+            34 => "Velocity",
+            35 => "Swiftness",
+            36 => "Accelerator",
+            37 => "Impel",
+            38 => "Breakneck",
+            39 => "Run Master",
+            _ => "Grandmaster"
+        };
     }
 }

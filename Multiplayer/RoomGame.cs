@@ -1,4 +1,5 @@
 ﻿using ExitPath.Server.Models;
+using ExitPath.Server.Multiplayer.Messages;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -398,8 +399,14 @@ namespace ExitPath.Server.Multiplayer
         {
             var oldXP = player.Data.XP;
             player.Data = player.Data with { XP = player.Data.XP + xp };
-            if (RewardData.XPLevel(player.Data.XP) > RewardData.XPLevel(oldXP))
+
+            var newLevel = RewardData.XPLevel(player.Data.XP);
+            if (newLevel > RewardData.XPLevel(oldXP))
             {
+                this.BroadcastMessage(Message.System(
+                    $"{player.Data.DisplayName} has just leveled up to Level {newLevel}: {RewardData.LevelName(newLevel)}",
+                    0x00CC00
+                ));
                 this.SendKudoBomb();
             }
         }
@@ -431,6 +438,11 @@ namespace ExitPath.Server.Multiplayer
                 rewards.Add(id, reward with { AvailableKudos = reward.AvailableKudos + 2 });
             }
             this.State = this.State with { Rewards = rewards.ToImmutable() };
+
+            this.BroadcastMessage(Message.System(
+                $"KudoBomb!  As celebration, all room members earn +2 kudos to give!",
+                0x00CC00
+            ));
         }
 
         public void ReportPosition(Player player, GamePlayerPosition pos)
@@ -440,6 +452,10 @@ namespace ExitPath.Server.Multiplayer
                 return;
             }
 
+            if (this.State.Positions.TryGetValue(p.LocalId, out var oldPos) && oldPos.CompletionTime == 0 && pos.CompletionTime > 0)
+            {
+                this.BroadcastMessage(Message.System($"{player.Data.DisplayName} has just beat the level."));
+            }
             this.State = this.State with
             {
                 Positions = this.State.Positions.SetItem(p.LocalId, pos)
@@ -468,8 +484,7 @@ namespace ExitPath.Server.Multiplayer
                 return;
             }
 
-            var target = this.State.Players.GetValueOrDefault(targetId);
-            if (target == null)
+            if (!this.Players.TryGetValue(targetId, out var target))
             {
                 return;
             }
@@ -482,7 +497,11 @@ namespace ExitPath.Server.Multiplayer
 
             reward = reward with { AvailableKudos = reward.AvailableKudos - 1 };
             this.State = this.State with { Rewards = this.State.Rewards.SetItem(p.LocalId, reward) };
-            this.GiveKudo(this.Players[targetId]);
+            this.GiveKudo(target);
+
+            this.SendMessage(target, Message.System(
+                $"{player.Data.DisplayName} has given you kudos!  You now have {target.Data.Kudos}"
+            ));
         }
     }
 }

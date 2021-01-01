@@ -1,4 +1,5 @@
 ﻿using ExitPath.Server.Config;
+using ExitPath.Server.Multiplayer.Messages;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -70,6 +71,14 @@ namespace ExitPath.Server.Multiplayer
             this.players[player] = room;
 
             logger.LogInformation("Player '{Name}' joined room '{Room}'", player.Data.DisplayName, room.Name);
+
+            foreach (var p in room.Players.Values)
+            {
+                this.SendMessage(p, p == player ?
+                    Message.System($"Successfully arrived at {room.Name}") :
+                    Message.System($"User {player.Data.DisplayName} entered the room")
+                );
+            }
         }
 
         public async Task<IRoom> AddPlayer(Player player, string roomId)
@@ -95,6 +104,8 @@ namespace ExitPath.Server.Multiplayer
             room.RemovePlayer(player);
 
             logger.LogInformation("Player '{Name}' left", player.Data.DisplayName);
+
+            room.BroadcastMessage(Message.System($"User {player.Data.DisplayName} left the room"));
         }
 
         public async Task CreateRoom(Player player, IRoom room)
