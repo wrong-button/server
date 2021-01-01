@@ -1,6 +1,6 @@
 ﻿namespace ExitPath.Server.Multiplayer
 {
-    public static class RewardData
+    public static class GameData
     {
         public static int MatchXP(int rank) => rank switch
         {
@@ -121,6 +121,62 @@
             38 => "Breakneck",
             39 => "Run Master",
             _ => "Grandmaster"
+        };
+
+        public static string? GameLevelName(int level) => level switch
+        {
+            0 => "Getting Out 1",
+            1 => "Getting Out 2",
+            2 => "Getting Out 3",
+            3 => "The Stadium",
+            4 => "The Stadium",
+            5 => "The Stadium",
+            6 => "The Stadium",
+            7 => "The Stadium",
+            8 => "The Stadium",
+            9 => "The Stadium",
+            10 => "The Audit",
+            11 => "Lab Testing",
+            12 => "Lab Testing",
+            13 => "Lab Testing",
+            14 => "Lab Testing",
+            15 => "The Path to Freedom",
+            16 => "The Path to Freedom",
+            17 => "Backrooms",
+            18 => "Backrooms",
+            19 => "Backrooms",
+            20 => "Outside",
+            21 => "Outside",
+            22 => "Outside",
+            23 => "Outside",
+            24 => "Outside",
+            25 => "Skyline City Limits",
+            26 => "Skyline City Limits",
+            27 => "Skyline City Limits",
+            28 => "Skyline City Limits",
+            29 => "Skyline City Limits",
+            30 => "Ending",
+            100 => "Marathon",
+            101 => "Front Door",
+            102 => "Crossroads",
+            103 => "Tubes",
+            104 => "Death Wall",
+            105 => "The Maze",
+            106 => "Lunge",
+            107 => "Unfriendly Teleporters",
+            108 => "Funk",
+            109 => "Cubicles",
+            110 => "Over and Under",
+            111 => "Zipper",
+            112 => "Jumper",
+            113 => "Slip and Slide",
+            114 => "Wombat",
+            115 => "Fuzz Balls",
+            116 => "Secret Staircase",
+            117 => "Cubey",
+            118 => "Descending",
+            119 => "Treadmillvania",
+            _ => null,
         };
     }
 }

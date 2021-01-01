@@ -62,6 +62,8 @@ namespace ExitPath.Server.Multiplayer
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? NextLevel { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? NextLevelName { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<object[]>? Positions { get; set; }
@@ -81,6 +83,7 @@ namespace ExitPath.Server.Multiplayer
         public GamePhase Phase { get; init; } = GamePhase.Lobby;
         public int Timer { get; init; } = 0;
         public int NextLevel { get; init; } = 0;
+        public string NextLevelName { get; init; } = "";
         public bool IsLevelFinished { get; init; } = false;
 
         public ImmutableDictionary<int, GamePlayerPosition> Positions = ImmutableDictionary.Create<int, GamePlayerPosition>();
@@ -95,6 +98,7 @@ namespace ExitPath.Server.Multiplayer
                 Phase = this.Phase.ToString(),
                 Timer = (int)Math.Ceiling((double)this.Timer / Realm.TPS),
                 NextLevel = this.NextLevel,
+                NextLevelName = this.NextLevelName,
                 Positions = Positions.Select((p) => p.Value.ToJSON(p.Key)).ToList(),
                 Checkpoints = Checkpoints.Select((p) => p.Value.ToJSON(p.Key)).ToList(),
                 Rewards = Rewards.Values.ToList()
@@ -139,6 +143,11 @@ namespace ExitPath.Server.Multiplayer
             if (oldState.NextLevel != this.NextLevel)
             {
                 diff.NextLevel = this.NextLevel;
+                needDiff = true;
+            }
+            if (oldState.NextLevelName != this.NextLevelName)
+            {
+                diff.NextLevelName = this.NextLevelName;
                 needDiff = true;
             }
 
@@ -236,11 +245,13 @@ namespace ExitPath.Server.Multiplayer
             switch (phase)
             {
                 case GamePhase.Lobby:
+                    var nextLevel = 100 + rand.Next(20);
                     this.State = this.State with
                     {
                         Phase = GamePhase.Lobby,
                         Timer = this.Realm.Config.GameCountdown * Realm.TPS,
-                        NextLevel = 100 + rand.Next(20),
+                        NextLevel = nextLevel,
+                        NextLevelName = GameData.GameLevelName(nextLevel) ?? "Unknown",
                         Checkpoints = ImmutableDictionary<int, GamePlayerCheckpoints>.Empty,
                     };
                     break;
@@ -375,8 +386,8 @@ namespace ExitPath.Server.Multiplayer
             {
                 var playerData = rankedPlayers[i];
                 var player = this.Players[playerData.Id];
-                var matchXP = RewardData.MatchXP(i);
-                var matchKudos = RewardData.MatchKudos(i);
+                var matchXP = GameData.MatchXP(i);
+                var matchKudos = GameData.MatchKudos(i);
                 rewards.Add(playerData.LocalId, new GamePlayerReward(playerData.LocalId, i + 1, matchXP, matchKudos, 0));
                 xps.Add((player, matchXP));
 
@@ -403,11 +414,11 @@ namespace ExitPath.Server.Multiplayer
             var oldXP = player.Data.XP;
             player.Data = player.Data with { XP = player.Data.XP + xp };
 
-            var newLevel = RewardData.XPLevel(player.Data.XP);
-            if (newLevel > RewardData.XPLevel(oldXP))
+            var newLevel = GameData.XPLevel(player.Data.XP);
+            if (newLevel > GameData.XPLevel(oldXP))
             {
                 this.BroadcastMessage(Message.System(
-                    $"{player.Data.DisplayName} has just leveled up to Level {newLevel}: {RewardData.LevelName(newLevel)}",
+                    $"{player.Data.DisplayName} has just leveled up to Level {newLevel}: {GameData.LevelName(newLevel)}",
                     0x00CC00
                 ));
                 this.SendKudoBomb();
