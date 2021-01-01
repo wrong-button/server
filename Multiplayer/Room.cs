@@ -16,6 +16,7 @@ namespace ExitPath.Server.Multiplayer
         void RemovePlayer(Player player);
 
         void Tick();
+        bool ProcessCommand(Player source, string name, string[] args);
 
         void SendMessage(Player player, Message msg);
         void BroadcastMessage(Message msg);
@@ -56,6 +57,11 @@ namespace ExitPath.Server.Multiplayer
             {
                 player.Tick(this);
             }
+        }
+
+        public virtual bool ProcessCommand(Player source, string name, string[] args)
+        {
+            return false;
         }
 
         public void SendMessage(Player player, Message msg)

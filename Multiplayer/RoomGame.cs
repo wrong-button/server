@@ -461,6 +461,11 @@ namespace ExitPath.Server.Multiplayer
 
         public void ReportPosition(Player player, GamePlayerPosition pos)
         {
+            if (this.State.Phase != GamePhase.InGame)
+            {
+                return;
+            }
+
             if (!this.State.Players.TryGetValue(player.ConnectionId, out var p))
             {
                 return;
@@ -479,6 +484,11 @@ namespace ExitPath.Server.Multiplayer
 
         public void ReportCheckpoint(Player player, int id)
         {
+            if (this.State.Phase != GamePhase.InGame)
+            {
+                return;
+            }
+
             if (!this.State.Players.TryGetValue(player.ConnectionId, out var p))
             {
                 return;
@@ -517,6 +527,64 @@ namespace ExitPath.Server.Multiplayer
             this.SendMessage(target, Message.System(
                 $"{player.Data.DisplayName} has given you kudos!  You now have {target.Data.Kudos}"
             ));
+        }
+
+        public override bool ProcessCommand(Player source, string name, string[] args)
+        {
+            if (base.ProcessCommand(source, name, args))
+            {
+                return true;
+            }
+
+            switch (name)
+            {
+                case "start":
+                    {
+                        if (this.State.Phase == GamePhase.InGame)
+                        {
+                            this.SendMessage(source, Message.Error("Game is already started."));
+                            break;
+                        }
+                        else if (this.State.Players.Count <= 1)
+                        {
+                            this.SendMessage(source, Message.Error("Not enough players."));
+                            break;
+                        }
+
+                        this.StartPhase(GamePhase.InGame);
+                        break;
+                    }
+
+                case "endgame":
+                    {
+                        if (this.State.Phase != GamePhase.InGame)
+                        {
+                            this.SendMessage(source, Message.Error("Not in game."));
+                            break;
+                        }
+
+                        this.StartPhase(GamePhase.Lobby);
+                        break;
+                    }
+
+                case "resettime":
+                    {
+                        this.State = this.State with
+                        {
+                            Timer = this.State.Phase switch
+                            {
+                                GamePhase.InGame => this.Realm.Config.FinishCountdown * Realm.TPS,
+                                GamePhase.Lobby => this.Realm.Config.GameCountdown * Realm.TPS,
+                                _ => this.State.Timer,
+                            }
+                        };
+                        break;
+                    }
+
+                default:
+                    return false;
+            }
+            return true;
         }
     }
 }

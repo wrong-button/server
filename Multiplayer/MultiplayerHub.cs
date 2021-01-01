@@ -135,6 +135,21 @@ namespace ExitPath.Server.Multiplayer
 
         public void SendMessage(string text)
         {
+            var room = this.Room;
+            var player = this.Player;
+            if (text.StartsWith("/"))
+            {
+                var parts = text[1..].Split((string?)null, StringSplitOptions.RemoveEmptyEntries);
+                this.realm.EnqueueAction(() =>
+                {
+                    if (!room.ProcessCommand(player, parts[0].ToLowerInvariant(), parts[1..]))
+                    {
+                        room.SendMessage(player, Message.Error($"Unrecognized command '/{parts[0]}'"));
+                    }
+                });
+                return;
+            }
+
             var now = DateTime.UtcNow;
             if (now.Subtract(this.LastMessage).TotalSeconds < 0.3)
             {
@@ -142,8 +157,6 @@ namespace ExitPath.Server.Multiplayer
             }
             this.LastMessage = now;
 
-            var player = this.Player;
-            var room = this.Room;
             this.realm.EnqueueAction(() =>
             {
                 room.BroadcastMessage(Message.Player(player, text));

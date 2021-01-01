@@ -18,6 +18,8 @@
         public static Message System(string msg, int color = 0xffffff) =>
             new Message("@SYSTEM", msg, color, color);
 
+        public static Message Error(string msg) => System(msg, 0xff0000);
+
         public static Message Player(Player player, string msg) =>
             new Message(player.Data.DisplayName, msg, player.Data.PrimaryColor, 0xffffff);
     }
