@@ -7,8 +7,6 @@ using System.Text.Json.Serialization;
 
 namespace ExitPath.Server.Multiplayer
 {
-    public record GamePlayer(int LocalId, Player Player);
-
     public record GamePlayerPosition(
         int Version,
         float X,
@@ -31,19 +29,15 @@ namespace ExitPath.Server.Multiplayer
         }
     }
 
-    public record GamePlayerData
-    {
-        public string Id { get; init; }
-        public int LocalId { get; init; }
-        public PlayerData Data { get; init; }
+    public record GamePlayerReward(
+        int Id,
+        int Placing,
+        int MatchXP,
+        int AvailableKudos,
+        int ReceivedKudos
+    );
 
-        public GamePlayerData(GamePlayer player)
-        {
-            this.Id = player.Player.ConnectionId;
-            this.LocalId = player.LocalId;
-            this.Data = player.Player.Data;
-        }
-    }
+    public record GamePlayerData(string Id, int LocalId, PlayerData Data);
 
     public enum GamePhase
     {
@@ -73,12 +67,15 @@ namespace ExitPath.Server.Multiplayer
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<object[]>? Checkpoints { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<GamePlayerReward>? Rewards { get; set; }
     }
 
     public record RoomGameState : RoomState<RoomGameState>
     {
         public int NextId { get; init; } = 1;
-        public ImmutableDictionary<string, GamePlayer> Players { get; init; } = ImmutableDictionary.Create<string, GamePlayer>();
+        public ImmutableDictionary<string, GamePlayerData> Players { get; init; } = ImmutableDictionary.Create<string, GamePlayerData>();
 
         public GamePhase Phase { get; init; } = GamePhase.Lobby;
         public int Timer { get; init; } = 0;
@@ -86,17 +83,19 @@ namespace ExitPath.Server.Multiplayer
 
         public ImmutableDictionary<int, GamePlayerPosition> Positions = ImmutableDictionary.Create<int, GamePlayerPosition>();
         public ImmutableDictionary<int, GamePlayerCheckpoints> Checkpoints = ImmutableDictionary.Create<int, GamePlayerCheckpoints>();
+        public ImmutableDictionary<int, GamePlayerReward> Rewards = ImmutableDictionary.Create<int, GamePlayerReward>();
 
         public override object ToJSON()
         {
             return new
             {
-                Players = Players.Values.Select(p => new GamePlayerData(p)).OrderBy(p => p.LocalId).ToList(),
+                Players = Players.Values.OrderBy(p => p.LocalId).ToList(),
                 Phase = this.Phase.ToString(),
                 Timer = (int)Math.Ceiling((double)this.Timer / Realm.TPS),
                 NextLevel = this.NextLevel,
                 Positions = Positions.Select((p) => p.Value.ToJSON(p.Key)).ToList(),
-                Checkpoints = Checkpoints.Select((p) => p.Value.ToJSON(p.Key)).ToList()
+                Checkpoints = Checkpoints.Select((p) => p.Value.ToJSON(p.Key)).ToList(),
+                Rewards = Rewards.Values.ToList()
             };
         }
 
@@ -111,11 +110,9 @@ namespace ExitPath.Server.Multiplayer
 
             foreach (var (id, player) in this.Players)
             {
-                var playerData = new GamePlayerData(player);
-                if (!oldState.Players.TryGetValue(id, out var oldPlayer) ||
-                    !new GamePlayerData(oldPlayer).Equals(playerData))
+                if (!oldState.Players.TryGetValue(id, out var oldPlayer) || !oldPlayer.Equals(player))
                 {
-                    diff.Updated.Add(playerData);
+                    diff.Updated.Add(player);
                     needDiff = true;
                 }
             }
@@ -185,6 +182,27 @@ namespace ExitPath.Server.Multiplayer
                 }
             }
 
+            if (this.Rewards.Count == 0 && oldState.Rewards.Count != 0)
+            {
+                diff.Rewards = new();
+                needDiff = true;
+            }
+            else if (this.Rewards.Count != 0)
+            {
+                foreach (var (id, reward) in this.Rewards)
+                {
+                    if (!oldState.Rewards.TryGetValue(id, out var oldReward) || !oldReward.Equals(reward))
+                    {
+                        if (diff.Rewards == null)
+                        {
+                            diff.Rewards = new();
+                        }
+                        diff.Rewards.Add(reward);
+                        needDiff = true;
+                    }
+                }
+            }
+
             if (diff.Removed.Count == 0)
             {
                 diff.Removed = null;
@@ -247,7 +265,10 @@ namespace ExitPath.Server.Multiplayer
             this.State = this.State with
             {
                 NextId = this.State.NextId + 1,
-                Players = this.State.Players.Add(player.ConnectionId, new(this.State.NextId, player)),
+                Players = this.State.Players.Add(
+                    player.ConnectionId,
+                    new(player.ConnectionId, this.State.NextId, player.Data with { })
+                ),
             };
 
             base.AddPlayer(player);
@@ -306,6 +327,7 @@ namespace ExitPath.Server.Multiplayer
                         if (timer <= 0)
                         {
                             this.StartPhase(GamePhase.Lobby);
+                            this.FinalizeMatchRewards();
                             goto case GamePhase.Lobby;
                         }
                         else if (timer != this.State.Timer)
@@ -316,7 +338,99 @@ namespace ExitPath.Server.Multiplayer
                     }
             }
 
+            foreach (var (id, player) in this.Players)
+            {
+                var playerData = this.State.Players[id];
+                if (playerData.Data != player.Data)
+                {
+                    this.State = this.State with
+                    {
+                        Players = this.State.Players.SetItem(id, playerData with { Data = player.Data })
+                    };
+                }
+            }
+
             base.Tick();
+        }
+
+        private void FinalizeMatchRewards()
+        {
+            var rankedPlayers = this.State.Players.Values
+                .Select(p => new
+                {
+                    Player = p,
+                    Time = this.State.Positions.GetValueOrDefault(p.LocalId)?.CompletionTime ?? 0
+                })
+                .OrderBy(p => p.Time == 0 ? int.MaxValue : p.Time)
+                .Select(p => p.Player)
+                .ToList();
+
+            var rewards = ImmutableDictionary.CreateBuilder<int, GamePlayerReward>();
+            var xps = new List<(Player, int)>();
+            for (var i = 0; i < rankedPlayers.Count; i++)
+            {
+                var playerData = rankedPlayers[i];
+                var player = this.Players[playerData.Id];
+                var matchXP = RewardData.MatchXP(i);
+                var matchKudos = RewardData.MatchKudos(i);
+                rewards.Add(playerData.LocalId, new GamePlayerReward(playerData.LocalId, i + 1, matchXP, matchKudos, 0));
+                xps.Add((player, matchXP));
+
+                playerData = playerData with
+                {
+                    Data = playerData.Data with
+                    {
+                        Matches = playerData.Data.Matches + 1,
+                        Wins = playerData.Data.Wins + (i == 0 ? 1 : 0)
+                    }
+                };
+                player.Data = playerData.Data;
+            }
+            this.State = this.State with { Rewards = rewards.ToImmutable() };
+
+            foreach (var (player, xp) in xps)
+            {
+                this.GiveXP(player, xp);
+            }
+        }
+
+        private void GiveXP(Player player, int xp)
+        {
+            var oldXP = player.Data.XP;
+            player.Data = player.Data with { XP = player.Data.XP + xp };
+            if (RewardData.XPLevel(player.Data.XP) > RewardData.XPLevel(oldXP))
+            {
+                this.SendKudoBomb();
+            }
+        }
+
+        private void GiveKudo(Player player)
+        {
+            if (!this.State.Players.TryGetValue(player.ConnectionId, out var data))
+            {
+                return;
+            }
+
+            player.Data = player.Data with { Kudos = player.Data.Kudos + 1 };
+            if (this.State.Rewards.TryGetValue(data.LocalId, out var reward))
+            {
+                reward = reward with { ReceivedKudos = reward.ReceivedKudos + 1 };
+                this.State = this.State with
+                {
+                    Rewards = this.State.Rewards.SetItem(data.LocalId, reward)
+                };
+            }
+            this.GiveXP(player, 5);
+        }
+
+        private void SendKudoBomb()
+        {
+            var rewards = ImmutableDictionary.CreateBuilder<int, GamePlayerReward>();
+            foreach (var (id, reward) in this.State.Rewards)
+            {
+                rewards.Add(id, reward with { AvailableKudos = reward.AvailableKudos + 2 });
+            }
+            this.State = this.State with { Rewards = rewards.ToImmutable() };
         }
 
         public void ReportPosition(Player player, GamePlayerPosition pos)
@@ -345,6 +459,30 @@ namespace ExitPath.Server.Multiplayer
             {
                 Checkpoints = this.State.Checkpoints.SetItem(p.LocalId, cp)
             };
+        }
+
+        public void GiveKudo(Player player, string targetId)
+        {
+            if (!this.State.Players.TryGetValue(player.ConnectionId, out var p))
+            {
+                return;
+            }
+
+            var target = this.State.Players.GetValueOrDefault(targetId);
+            if (target == null)
+            {
+                return;
+            }
+
+            var reward = this.State.Rewards.GetValueOrDefault(p.LocalId);
+            if (reward == null || reward.AvailableKudos == 0)
+            {
+                return;
+            }
+
+            reward = reward with { AvailableKudos = reward.AvailableKudos - 1 };
+            this.State = this.State with { Rewards = this.State.Rewards.SetItem(p.LocalId, reward) };
+            this.GiveKudo(this.Players[targetId]);
         }
     }
 }

@@ -114,5 +114,14 @@ namespace ExitPath.Server.Multiplayer
                 this.realm.EnqueueAction(() => room.ReportCheckpoint(player, id));
             }
         }
+
+        public void GiveKudo(string targetId)
+        {
+            if (this.Room is RoomGame room)
+            {
+                var player = this.Player;
+                this.realm.EnqueueAction(() => room.GiveKudo(player, targetId));
+            }
+        }
     }
 }

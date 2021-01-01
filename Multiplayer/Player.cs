@@ -10,7 +10,7 @@ namespace ExitPath.Server.Multiplayer
     public class Player
     {
         public string ConnectionId { get; }
-        public PlayerData Data { get; }
+        public PlayerData Data { get; set; }
 
         private ImmutableDictionary<string, Player> players = ImmutableDictionary.Create<string, Player>();
         private IRoomState? state = null;
