@@ -63,6 +63,8 @@ namespace ExitPath.Server.Multiplayer
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public int? NextLevel { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? NextLevelCode { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? NextLevelName { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -83,6 +85,7 @@ namespace ExitPath.Server.Multiplayer
         public GamePhase Phase { get; init; } = GamePhase.Lobby;
         public int Timer { get; init; } = 0;
         public int NextLevel { get; init; } = 0;
+        public string NextLevelCode { get; init; } = "";
         public string NextLevelName { get; init; } = "";
         public bool IsLevelFinished { get; init; } = false;
 
@@ -98,6 +101,7 @@ namespace ExitPath.Server.Multiplayer
                 Phase = this.Phase.ToString(),
                 Timer = (int)Math.Ceiling((double)this.Timer / Realm.TPS),
                 NextLevel = this.NextLevel,
+                NextLevelCode = this.NextLevelCode,
                 NextLevelName = this.NextLevelName,
                 Positions = Positions.Select((p) => p.Value.ToJSON(p.Key)).ToList(),
                 Checkpoints = Checkpoints.Select((p) => p.Value.ToJSON(p.Key)).ToList(),
@@ -143,6 +147,11 @@ namespace ExitPath.Server.Multiplayer
             if (oldState.NextLevel != this.NextLevel)
             {
                 diff.NextLevel = this.NextLevel;
+                needDiff = true;
+            }
+            if (oldState.NextLevelCode != this.NextLevelCode)
+            {
+                diff.NextLevelCode = this.NextLevelCode;
                 needDiff = true;
             }
             if (oldState.NextLevelName != this.NextLevelName)
@@ -251,6 +260,7 @@ namespace ExitPath.Server.Multiplayer
                         Phase = GamePhase.Lobby,
                         Timer = this.Realm.Config.GameCountdown * Realm.TPS,
                         NextLevel = nextLevel,
+                        NextLevelCode = "",
                         NextLevelName = GameData.GameLevelName(nextLevel) ?? "Unknown",
                         Checkpoints = ImmutableDictionary<int, GamePlayerCheckpoints>.Empty,
                     };
@@ -527,6 +537,50 @@ namespace ExitPath.Server.Multiplayer
             this.SendMessage(target, Message.System(
                 $"{player.Data.DisplayName} has given you kudos!  You now have {target.Data.Kudos}"
             ));
+        }
+
+        public void SetNextLevel(Player player, string level)
+        {
+            if (this.State.Phase == GamePhase.InGame)
+            {
+                this.SendMessage(player, Message.Error("Game is already started."));
+                return;
+            }
+
+            if (int.TryParse(level, out var levelNum))
+            {
+                var levelName = GameData.GameLevelName(levelNum);
+                if (levelName == null)
+                {
+                    this.SendMessage(player, Message.Error("Invalid level number."));
+                    return;
+                }
+                this.State = this.State with
+                {
+                    NextLevel = levelNum,
+                    NextLevelCode = "",
+                    NextLevelName = levelName,
+                };
+            }
+            else
+            {
+                string? name = null;
+                try
+                {
+                    name = LevelData.Parse(level).Name;
+                }
+                catch (Exception)
+                {
+                    this.SendMessage(player, Message.Error("Invalid level code."));
+                    return;
+                }
+                this.State = this.State with
+                {
+                    NextLevel = 999,
+                    NextLevelCode = level,
+                    NextLevelName = name,
+                };
+            }
         }
 
         public override bool ProcessCommand(Player source, string name, string[] args)

@@ -162,5 +162,14 @@ namespace ExitPath.Server.Multiplayer
                 room.BroadcastMessage(Message.Player(player, text));
             });
         }
+
+        public void SetNextLevel(string level)
+        {
+            if (this.Room is RoomGame room)
+            {
+                var player = this.Player;
+                this.realm.EnqueueAction(() => room.SetNextLevel(player, level));
+            }
+        }
     }
 }
