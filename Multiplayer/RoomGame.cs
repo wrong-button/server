@@ -599,11 +599,6 @@ namespace ExitPath.Server.Multiplayer
                             this.SendMessage(source, Message.Error("Game is already started."));
                             break;
                         }
-                        else if (this.State.Players.Count <= 1)
-                        {
-                            this.SendMessage(source, Message.Error("Not enough players."));
-                            break;
-                        }
 
                         this.StartPhase(GamePhase.InGame);
                         break;
