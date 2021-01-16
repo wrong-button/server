@@ -91,11 +91,12 @@ namespace ExitPath.Server.Multiplayer
             return new();
         }
 
-        public async Task<object> JoinRoom(string? roomId)
+        public async Task<object> JoinRoom(string? roomId, bool asSpectator)
         {
             roomId ??= "";
             try
             {
+                this.Player.IsSpectator = asSpectator;
                 var room = await this.realm.AddPlayer(this.Player, roomId);
                 this.Room = room;
             }

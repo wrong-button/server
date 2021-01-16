@@ -282,19 +282,22 @@ namespace ExitPath.Server.Multiplayer
 
         public override void AddPlayer(Player player)
         {
-            if (this.State.Phase == GamePhase.InGame)
+            if (!player.IsSpectator)
             {
-                throw new Exception("Game is in progress");
-            }
+                if (this.State.Phase == GamePhase.InGame)
+                {
+                    throw new Exception("Game is in progress");
+                }
 
-            this.State = this.State with
-            {
-                NextId = this.State.NextId + 1,
-                Players = this.State.Players.Add(
-                    player.ConnectionId,
-                    new(player.ConnectionId, this.State.NextId, player.Data with { })
-                ),
-            };
+                this.State = this.State with
+                {
+                    NextId = this.State.NextId + 1,
+                    Players = this.State.Players.Add(
+                        player.ConnectionId,
+                        new(player.ConnectionId, this.State.NextId, player.Data with { })
+                    ),
+                };
+            }
 
             base.AddPlayer(player);
         }
@@ -316,7 +319,7 @@ namespace ExitPath.Server.Multiplayer
                 case GamePhase.Lobby:
                     {
                         var timer = this.State.Timer - 1;
-                        if (this.Players.Count <= 1)
+                        if (this.State.Players.Count <= 1)
                         {
                             timer = this.Realm.Config.GameCountdown * Realm.TPS;
                         }
@@ -363,14 +366,14 @@ namespace ExitPath.Server.Multiplayer
                     }
             }
 
-            foreach (var (id, player) in this.Players)
+            foreach (var playerData in this.State.Players.Values)
             {
-                var playerData = this.State.Players[id];
+                var player = this.Players[playerData.Id];
                 if (playerData.Data != player.Data)
                 {
                     this.State = this.State with
                     {
-                        Players = this.State.Players.SetItem(id, playerData with { Data = player.Data })
+                        Players = this.State.Players.SetItem(playerData.Id, playerData with { Data = player.Data })
                     };
                 }
             }

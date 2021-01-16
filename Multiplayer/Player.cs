@@ -11,6 +11,7 @@ namespace ExitPath.Server.Multiplayer
     {
         public string ConnectionId { get; }
         public PlayerData Data { get; set; }
+        public bool IsSpectator { get; set; }
 
         private ImmutableDictionary<string, Player> players = ImmutableDictionary.Create<string, Player>();
         private IRoomState? state = null;
