@@ -18,6 +18,10 @@ namespace ExitPath.Server.Controllers.Multiplayer
 
         public IActionResult Handle([FromBody] AuthRequest request)
         {
+            if (request.Version < MultiplayerHub.ProtocolVersion)
+            {
+                return BadRequest(new { Error = "Old version, please reload and try again." });
+            }
             var token = this.authToken.Sign(request.Player);
             return Ok(new AuthResponse { Token = token });
         }
@@ -27,6 +31,8 @@ namespace ExitPath.Server.Controllers.Multiplayer
     {
         [Required]
         public PlayerData Player { get; init; } = new();
+
+        public int Version { get; init; } = 0;
     }
 
     public record AuthResponse

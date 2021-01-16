@@ -13,6 +13,7 @@ namespace ExitPath.Server.Multiplayer
     [Authorize(AuthenticationSchemes = "Multiplayer")]
     public class MultiplayerHub : Hub
     {
+        public static int ProtocolVersion = 1;
         private static readonly object PlayerKey = new();
         private static readonly object RoomKey = new();
         private static readonly object LastMessageKey = new();
