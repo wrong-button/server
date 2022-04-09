@@ -614,6 +614,11 @@ namespace ExitPath.Server.Multiplayer
 
                 case "endgame":
                     {
+                        if (source.IsSpectator)
+                        {
+                            this.SendMessage(source, Message.Error("Only players can end the game."));
+                            break;
+                        }
                         if (this.State.Phase != GamePhase.InGame)
                         {
                             this.SendMessage(source, Message.Error("Not in game."));
